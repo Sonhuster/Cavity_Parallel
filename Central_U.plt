@@ -1,0 +1,13 @@
+VARIABLES="U","Y"
+ZONE F=POINT
+I=10
+nan 	 0.000000
+nan 	 0.010000
+nan 	 0.020000
+nan 	 0.030000
+nan 	 0.040000
+nan 	 0.050000
+nan 	 0.060000
+nan 	 0.070000
+nan 	 0.080000
+nan 	 0.090000
