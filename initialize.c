@@ -16,7 +16,7 @@ void initialize(int nx, int ny, float *uu, float *vv, float *pp)
 	{
         for (j = 0; j < ny-1; j++) 
 		{
-            *(vv + i * ny + j) = 0;
+            *(vv + i * (ny-1) + j) = 0;
         }
     }
 	
