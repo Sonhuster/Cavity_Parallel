@@ -6,9 +6,9 @@
 #include "Update.h"
 
 
-#define NROWS 		11		//Grid Size X
-#define NCOLS		11		//Grid Size Y
-#define Iteration   2000		//Define Iteration
+#define NROWS 		51		//Grid Size X
+#define NCOLS		51		//Grid Size Y
+#define Iteration   3000		//Define Iteration
 #define Tolerance   0.0001	//Define required error
 #define trans_u 	1
 #define trans_v 	2
@@ -18,8 +18,7 @@
 #define trans_nei_p 6
 #define Min_Procs 	4
 #define MASTER 		0
-#define hx 			0.01
-#define hy 			0.01
+#define dom_length 	1
 
 
 
@@ -36,8 +35,7 @@ void Recv_neighbor (float *uu, int nx, int ny, int left, int right, int top, int
 int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 {
 	int nx = NROWS, ny = NCOLS;
-	
-
+	float hx = (float) dom_length/(NROWS-2), hy = (float) dom_length/(NCOLS-2);
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &num_tasks);
 	MPI_Status status;
@@ -89,6 +87,7 @@ int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 		MPI_Recv(&sub_u[0][0], usize[0]*usize[1], MPI_FLOAT, source, trans_u, comm, MPI_STATUS_IGNORE);
 		MPI_Recv(&sub_v[0][0], vsize[0]*vsize[1], MPI_FLOAT, source, trans_v, comm, MPI_STATUS_IGNORE);
 		MPI_Recv(&sub_p[0][0], psize[0]*psize[1], MPI_FLOAT, source, trans_p, comm, MPI_STATUS_IGNORE);
+		
 		
 		//Iteration Calculation
 		for (int it = 0; it <= Iteration; it ++)
@@ -313,14 +312,14 @@ int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 					{Full_V[(dim[0]-1)*local_nrows + i][(dim[1]-1)*local_ncols + j] = Collected_V_corner[i][j];}
 				}
 			}
-			
+			//if (it  == Iteration) {print_array(&Full_U[0][0], NROWS-1, NCOLS);}
 			//Continuity residual as error measure
 			float error = 0;
-			for (int i = 1; i <= NROWS-2; i++)
+			for (int i = 1; i < NROWS-2; i++)
 			{
-				for (int j = 1; j <= NCOLS-2; j++)
+				for (int j = 1; j < NCOLS-2; j++)
 				{
-					error = error + abs(Full_U[i][j] - Full_U[i][j-1])/1 + abs(Full_V[i][j] - Full_V[i-1][j])/1;
+					error = error + abs((Full_U[i][j] - Full_U[i][j-1])/hx + (Full_V[i-1][j] - Full_V[i][j])/hy);
 				}
 			}
 			//After the converged solution, we map the staggered variables to collocated variables
@@ -334,8 +333,8 @@ int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 					p_final[i][j] = 0.25*(Full_P[i][j] + Full_P[i+1][j] + Full_P[i][j+1] + Full_P[i+1][j+1]);
 				}
 			}
-			if (it  % 50 == 0) {printf("\nIteration: %d,	Error: %f", it, error);}
-			if (it  == Iteration) {print_array(&u_final[0][0], NROWS-1, NCOLS-1);}
+			if (it  % 50 == 0) {printf("\nIteration: %d,	Error: %0.7f", it, error);}
+			//if (it  == Iteration) {print_array(&u_final[0][0], NROWS-1, NCOLS-1);}
 			
 			// OUTPUT DATA
 			FILE *fout2, *fout3;
@@ -350,25 +349,28 @@ int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 
 			else
 			{
-				fprintf( fout2, "VARIABLES=\"X\",\"Y\",\"U\",\"V\",\"P\"\n");
+				fprintf( fout2, "VARIABLES=\"X\",\"Y\",\"Vel\", \"U\",\"V\",\"P\"\n");
 				fprintf( fout2, "ZONE  F=POINT\n");
 				fprintf( fout2, "I=%d, J=%d\n", NROWS-1, NCOLS-1 );
-
+				float vel[NROWS-1][NCOLS-1];
 				for ( int j = 0 ; j < NCOLS-1 ; j++ )
 				{
 					for ( int i = 0 ; i < NROWS-1 ; i++ )
 					{
 						float xpos, ypos;
 						xpos = i*hx;
-						ypos = j*hy;
-	
-						fprintf( fout2, "%5.8lf\t%5.8lf\t%5.8lf\t%5.8lf\t%5.8lf\n", xpos, ypos, u_final[i][j], v_final[i][j], p_final[i][j] );
+						ypos = 1-j*hy;
+						vel[i][j] = sqrt(pow(u_final[i][j],2) + pow(v_final[i][j],2));
+						fprintf( fout2, "%5.8lf\t%5.8lf\t%5.8lf\t%5.8lf\t%5.8lf\t%5.8lf\n", xpos, ypos, vel[i][j], u_final[i][j], v_final[i][j], p_final[i][j] );
 					}
 				}
 			}
 	
 			fclose( fout2 );
-	
+			float data_u[17] = 
+			{1,0.84123,0.78871,0.73722,0.68717,0.23151,0.00332,-0.13641,-0.20581,-0.2109,-0.15662,-0.1015,-0.06434,-0.04775,-0.04192,-0.03717,0};
+			float data_y[17] =
+			{0,0.0234,0.0312,0.0391,0.0469,0.1484,0.2656,0.3828,0.5,0.5469,0.7187,0.8281,0.8984,0.9297,0.9375,0.9453,1};
 			// CENTRAL --U
 			fprintf(fout3, "VARIABLES=\"U\",\"Y\"\n");
 			fprintf(fout3, "ZONE F=POINT\n");
@@ -379,10 +381,25 @@ int *Decompose(int num_tasks, int my_rank, int argc, char *argv[], int *dim_mid)
 				if ((NROWS-1) % 2 != 0)fprintf( fout3, "%0.6f \t %0.6f\n", (u_final[(NROWS-1)/2][j]), ypos );
 				if ((NROWS-1) % 2 == 0)fprintf( fout3, "%0.6f \t %0.6f\n", (u_final[NROWS/2][j] + u_final[(NROWS/2)-1][j])/2, ypos);
 			}
+			fprintf(fout3, "VARIABLES=\"U\",\"Y\"\n");
+			fprintf(fout3, "ZONE F=POINT\n");
+			fprintf(fout3, "I=%d\n", 17 );
+			for ( int j = 0 ; j < 17 ; ++j )
+			{
+				fprintf( fout3, "%0.6f \t %0.6f\n", data_u[j], data_y[j] );
+			}
+			
 			fclose( fout3 );
 		}
+			if (it == 2000)  
+			{	
+				MPI_Abort(comm, 0); printf ("\n");
+			}
 		}
-	
+		/*================================================================================================*/
+		/*================================================================================================*/
+		/*================================================================================================*/
+		/*================================================================================================*/
 	MPI_Barrier(comm);
 	}
 	
