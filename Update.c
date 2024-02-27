@@ -1,15 +1,17 @@
 #include "Update.h"
 #include <math.h>
 #include <stdlib.h>
+#define dom_length 	1
 
-
+#define NROWS 		51		//Grid Size X
+#define NCOLS		51		//Grid Size Y
 
 
 
 
 void update (float *uu, float *vv, float *pp, int nx, int ny, int top, int bottom, int left, int right)
 {
-	float 	hx = 0.01, hy = 0.01,
+	float 	hx = (float) dom_length/(NROWS-2), hy = (float) dom_length/(NCOLS-2),
 			delta = 4.5, dt = 0.001, Re = 100;
 	int nux, nvy;
 	nux = nx, nvy = ny;
